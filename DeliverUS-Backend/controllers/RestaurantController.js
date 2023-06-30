@@ -9,7 +9,7 @@ exports.index = async function (req, res) {
   try {
     const restaurants = await Restaurant.findAll(
       {
-        attributes: ['id', 'name', 'description', 'address', 'postalCode', 'url', 'shippingCosts', 'averageServiceMinutes', 'email', 'phone', 'logo', 'heroImage', 'status', 'restaurantCategoryId'],
+        attributes: ['id', 'name', 'description', 'address', 'postalCode', 'url', 'shippingCosts', 'averageServiceMinutes', 'email', 'phone', 'logo', 'heroImage', 'status', 'restaurantCategoryId', 'orderByPrice'],
         include:
       {
         model: RestaurantCategory,
@@ -28,7 +28,7 @@ exports.indexOwner = async function (req, res) {
   try {
     const restaurants = await Restaurant.findAll(
       {
-        attributes: ['id', 'name', 'description', 'address', 'postalCode', 'url', 'shippingCosts', 'averageServiceMinutes', 'email', 'phone', 'logo', 'heroImage', 'status', 'restaurantCategoryId'],
+        attributes: ['id', 'name', 'description', 'address', 'postalCode', 'url', 'shippingCosts', 'averageServiceMinutes', 'email', 'phone', 'logo', 'heroImage', 'status', 'restaurantCategoryId', 'orderByPrice'],
         where: { userId: req.user.id }
       })
     res.json(restaurants)
@@ -58,6 +58,7 @@ exports.create = async function (req, res) {
 exports.show = async function (req, res) {
   // Only returns PUBLIC information of restaurants
   try {
+    const orderCriteriaRestaurant = await Restaurant.findByPk(req.params.restaurantId, { attributes: ['orderByPrice'] })
     const restaurant = await Restaurant.findByPk(req.params.restaurantId, {
       attributes: { exclude: ['userId'] },
       include: [{
@@ -69,7 +70,7 @@ exports.show = async function (req, res) {
         model: RestaurantCategory,
         as: 'restaurantCategory'
       }],
-      order: [[{model:Product, as: 'products'}, 'order', 'ASC']],
+      order: orderCriteriaRestaurant.orderByPrice ? [[{ model: Product, as: 'products' }, 'price', 'DESC']] : [[{ model: Product, as: 'products' }, 'order', 'ASC']]
     }
     )
     res.json(restaurant)
@@ -104,6 +105,17 @@ exports.destroy = async function (req, res) {
       message = 'Could not delete restaurant.'
     }
     res.json(message)
+  } catch (err) {
+    res.status(500).send(err)
+  }
+}
+
+exports.changeSort = async function (req, res) {
+  try {
+    const restaurant = await Restaurant.findByPk(req.params.restaurantId)
+    await Restaurant.update({ orderByPrice: !restaurant.orderByPrice }, { where: { id: req.params.restaurantId } })
+    const updatedRestaurant = await Restaurant.findByPk(req.params.restaurantId)
+    res.json(updatedRestaurant)
   } catch (err) {
     res.status(500).send(err)
   }
